@@ -1,40 +1,24 @@
-// Feruz Market Bot — Asosiy bot fayli
 const { Telegraf } = require('telegraf');
 const connectDB = require('./database');
 
-// Handlerlar
 const userHandlers = require('./handlers/userHandlers');
 const adminHandlers = require('./handlers/adminHandlers');
 
-/**
- * Botni yaratish va barcha handlerlarni ulash
- * @param {string} token - Bot token
- * @returns {Telegraf} - Telegraf bot instansiyasi
- */
 const createBot = (token) => {
   const bot = new Telegraf(token);
 
-  // ============================================
   // KOMANDALAR
-  // ============================================
-
-  // /start komandasi
   bot.start(async (ctx) => {
     await connectDB();
     await userHandlers.startHandler(ctx);
   });
 
-  // /admin komandasi
   bot.command('admin', async (ctx) => {
     await connectDB();
     await adminHandlers.adminPanelHandler(ctx);
   });
 
-  // ============================================
-  // MATNLI TUGMALAR (hears)
-  // ============================================
-
-  // --- Foydalanuvchi tugmalari ---
+  // MATNLI TUGMALAR
   bot.hears('🛍 Mahsulotlar', async (ctx) => {
     await connectDB();
     await userHandlers.mahsulotlarHandler(ctx);
@@ -60,7 +44,6 @@ const createBot = (token) => {
     await userHandlers.bekorQilishHandler(ctx);
   });
 
-  // --- Admin tugmalari ---
   bot.hears('➕ Mahsulot qo\'shish', async (ctx) => {
     await connectDB();
     await adminHandlers.mahsulotQoshishHandler(ctx);
@@ -81,14 +64,18 @@ const createBot = (token) => {
     await adminHandlers.asosiyMenuHandler(ctx);
   });
 
-  // ============================================
-  // INLINE TUGMALAR (callback query)
-  // ============================================
+  // INLINE TUGMALAR
 
-  // Mahsulot tanlash (buyurtma uchun)
+  // Mahsulot tanlash (buyurtma)
   bot.action(/^tanlash_/, async (ctx) => {
     await connectDB();
     await userHandlers.mahsulotTanlashHandler(ctx);
+  });
+
+  // MIQDOR TANLASH (yangi!)
+  bot.action(/^miqdor_/, async (ctx) => {
+    await connectDB();
+    await userHandlers.miqdorTanlashHandler(ctx);
   });
 
   // Savatdan olib tashlash
@@ -97,54 +84,61 @@ const createBot = (token) => {
     await userHandlers.olibTashlashHandler(ctx);
   });
 
-  // Yana qo'shish
   bot.action('yana_qoshish', async (ctx) => {
     await connectDB();
     await userHandlers.yanaQoshishHandler(ctx);
   });
 
-  // Savatni tozalash
   bot.action('savatni_tozalash', async (ctx) => {
     await connectDB();
     await userHandlers.savatniTozalashHandler(ctx);
   });
 
-  // Rasmiylashtirish (telefon raqam so'rash)
   bot.action('rasmiylashtirish', async (ctx) => {
     await connectDB();
     await userHandlers.rasmiylashtirishHandler(ctx);
   });
 
-  // Tasdiqlash (buyurtmani ko'rib chiqish)
   bot.action('tasdiqlash_buyurtma', async (ctx) => {
     await connectDB();
     await userHandlers.tasdiqlashBuyurtmaHandler(ctx);
   });
 
-  // Bekor qilish (inline)
   bot.action('bekor_inline', async (ctx) => {
     await connectDB();
     await userHandlers.bekorInlineHandler(ctx);
   });
 
-  // --- Admin inline tugmalari ---
+  // ADMIN INLINE TUGMALAR
 
-  // Tahrirlash uchun mahsulotni tanlash
-  bot.action(/^tahrir_(?!nom_|narx_)/, async (ctx) => {
+  // Birlik tanlash
+  bot.action(/^birlik_/, async (ctx) => {
     await connectDB();
-    await adminHandlers.tahrirTanlashHandler(ctx);
+    await adminHandlers.birlikTanlashHandler(ctx);
   });
 
-  // Nomini o'zgartirish
+  // Birlikni tahrirlash
+  bot.action(/^tahrir_birlik_/, async (ctx) => {
+    await connectDB();
+    await adminHandlers.tahrirBirlikHandler(ctx);
+  });
+
+  // Nomini tahrirlash
   bot.action(/^tahrir_nom_/, async (ctx) => {
     await connectDB();
     await adminHandlers.tahrirNomHandler(ctx);
   });
 
-  // Narxini o'zgartirish
+  // Narxini tahrirlash
   bot.action(/^tahrir_narx_/, async (ctx) => {
     await connectDB();
     await adminHandlers.tahrirNarxHandler(ctx);
+  });
+
+  // Mahsulotni tanlash (tahrir uchun)
+  bot.action(/^tahrir_(?!nom_|narx_|birlik_)/, async (ctx) => {
+    await connectDB();
+    await adminHandlers.tahrirTanlashHandler(ctx);
   });
 
   // O'chirish
@@ -153,39 +147,23 @@ const createBot = (token) => {
     await adminHandlers.mahsulotOchirishHandler(ctx);
   });
 
-  // ============================================
-  // KONTAKT (telefon raqam)
-  // ============================================
-
+  // KONTAKT
   bot.on('contact', async (ctx) => {
     await connectDB();
     await userHandlers.telefonQabulQilish(ctx);
   });
 
-  // ============================================
-  // MATNLI XABARLAR (holat bo'yicha)
-  // ============================================
-
+  // MATNLI XABARLAR
   bot.on('text', async (ctx) => {
     await connectDB();
 
-    // Avval admin handlerlarni tekshirish
     const adminNatija = await adminHandlers.adminMatnHandler(ctx);
     if (adminNatija) return;
 
-    // Keyin foydalanuvchi handlerlarni tekshirish
     const userNatija = await userHandlers.matnHandler(ctx);
     if (userNatija) return;
-
-    // Agar hech qaysi holat mos kelmasa
-    const adminId = Number(process.env.ADMIN_ID);
-    const isAdmin = ctx.from.id === adminId;
-
-    // Noma'lum xabar uchun
-    // (menyu tugmalari ishladi bo'lsa, bu yerga kelmaydi)
   });
 
-  // Xatoliklarni ushlash
   bot.catch((xatolik, ctx) => {
     console.error(`❌ Bot xatosi [${ctx.updateType}]:`, xatolik);
   });
