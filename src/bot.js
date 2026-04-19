@@ -172,3 +172,5 @@ const createBot = (token) => {
 };
 
 module.exports = { createBot };
+
+///so'ngi yangilanishh 2026-04-19
