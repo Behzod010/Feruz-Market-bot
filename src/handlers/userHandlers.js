@@ -128,7 +128,7 @@ const buyurtmaBoshlanishi = async (ctx) => {
 // =============================================
 const mahsulotTanlashHandler = async (ctx) => {
   try {
-    const mahsulotId = ctx.callbackQuery.data.replace('tanlash_', '');
+    const mahsulotId = String(ctx.callbackQuery.data).replace('tanlash_', '').trim();
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
 
     const mahsulot = await Product.findById(mahsulotId);
@@ -136,37 +136,37 @@ const mahsulotTanlashHandler = async (ctx) => {
       return await ctx.answerCbQuery('❌ Mahsulot topilmadi!');
     }
 
-    // Tanlangan mahsulotni vaqtinchalik saqlash
+    const birlik = mahsulot.birlik || 'dona';
+
+    // Vaqtinchalik tanlangan mahsulotni saqlash
     foydalanuvchi.vaqtinchalik = {
-      ...foydalanuvchi.vaqtinchalik,
+      ...(foydalanuvchi.vaqtinchalik || {}),
       tanlangan_mahsulot: {
-        id: mahsulotId,
-        nomi: mahsulot.nomi,
-        narxi: mahsulot.narxi,
-        birlik: mahsulot.birlik || 'dona',
+        id: String(mahsulot._id),
+        nomi: mahsulot.nomi || 'Mahsulot',
+        narxi: Number(mahsulot.narxi || 0),
+        birlik: birlik,
       },
     };
+
     foydalanuvchi.holat = 'buyurtma_miqdor';
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
-    const birlik = mahsulot.birlik || 'dona';
-
-    await ctx.editMessageText(
-      `📦 *${mahsulot.nomi}*\n` +
-      `💰 Narxi: ${narxFormat(mahsulot.narxi)} so'm / ${birlik}\n\n` +
-      `📏 Necha *${birlik}* buyurtma qilasiz?\n\n` +
-      `Quyidagi tugmalardan tanlang yoki o'zingiz yozing:`,
-      {
-        parse_mode: 'Markdown',
-        ...keyboards.miqdorTanlash(birlik),
-      }
-    );
-
     await ctx.answerCbQuery();
+
+    // editMessageText o‘rniga reply ishlatamiz
+    await ctx.reply(
+      `📦 ${mahsulot.nomi}\n` +
+      `💰 Narxi: ${narxFormat(mahsulot.narxi)} so'm / ${birlik}\n\n` +
+      `📏 Necha ${birlik} buyurtma qilasiz?\n\n` +
+      `Quyidagi tugmalardan tanlang yoki o'zingiz yozing:`,
+      keyboards.miqdorTanlash(birlik)
+    );
   } catch (xatolik) {
     console.error('Mahsulot tanlash xatosi:', xatolik);
     await ctx.answerCbQuery('❌ Xatolik!');
+    await ctx.reply(`Xato: ${xatolik.message}`);
   }
 };
 
@@ -190,7 +190,6 @@ const miqdorTanlashHandler = async (ctx) => {
       return await ctx.answerCbQuery('❌ Mahsulot topilmadi!');
     }
 
-    // Savatga qo'shish
     const savat = foydalanuvchi.vaqtinchalik?.savat || [];
 
     const mavjudIndex = savat.findIndex((item) => item.id === tanlangan.id);
@@ -201,12 +200,11 @@ const miqdorTanlashHandler = async (ctx) => {
         id: tanlangan.id,
         nomi: tanlangan.nomi,
         narxi: tanlangan.narxi,
-        birlik: tanlangan.birlik,
+        birlik: tanlangan.birlik || 'dona',
         soni: miqdor,
       });
     }
 
-    // Tanlangan mahsulotni tozalash
     foydalanuvchi.vaqtinchalik = {
       savat,
       tanlangan_mahsulot: null,
@@ -215,28 +213,26 @@ const miqdorTanlashHandler = async (ctx) => {
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
-    await ctx.answerCbQuery(`✅ ${tanlangan.nomi} ${miqdor} ${tanlangan.birlik} qo'shildi!`);
+    await ctx.answerCbQuery(`✅ ${tanlangan.nomi} qo'shildi!`);
 
-    // Savatni ko'rsatish
     let jamiNarx = 0;
-    let savatMatni = '🧺 *Sizning savatingiz:*\n\n';
+    let savatMatni = '🧺 Savatingiz:\n\n';
+
     savat.forEach((item, index) => {
       const narx = item.narxi * item.soni;
       jamiNarx += narx;
-      savatMatni += `${index + 1}. *${item.nomi}* — ${item.soni} ${item.birlik}\n`;
+      savatMatni += `${index + 1}. ${item.nomi} — ${item.soni} ${item.birlik || 'dona'}\n`;
       savatMatni += `   💰 ${narxFormat(item.narxi)} x ${item.soni} = ${narxFormat(narx)} so'm\n`;
     });
-    savatMatni += `\n━━━━━━━━━━━━━━━━━━━━━━━`;
-    savatMatni += `\n💰 *Jami: ${narxFormat(jamiNarx)} so'm*`;
-    savatMatni += '\n\n🗑 Olib tashlash uchun mahsulot ustiga bosing.';
 
-    await ctx.editMessageText(savatMatni, {
-      parse_mode: 'Markdown',
-      ...keyboards.savatKorsatish(savat),
-    });
+    savatMatni += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    savatMatni += `💰 Jami: ${narxFormat(jamiNarx)} so'm`;
+
+    await ctx.reply(savatMatni, keyboards.savatKorsatish(savat));
   } catch (xatolik) {
     console.error('Miqdor tanlash xatosi:', xatolik);
     await ctx.answerCbQuery('❌ Xatolik!');
+    await ctx.reply(`Xato: ${xatolik.message}`);
   }
 };
 
