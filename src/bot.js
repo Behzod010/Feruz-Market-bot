@@ -1,6 +1,5 @@
 const { Telegraf } = require('telegraf');
 const connectDB = require('./database');
-
 const userHandlers = require('./handlers/userHandlers');
 const adminHandlers = require('./handlers/adminHandlers');
 
@@ -72,7 +71,7 @@ const createBot = (token) => {
     await userHandlers.mahsulotTanlashHandler(ctx);
   });
 
-  // MIQDOR TANLASH (yangi!)
+  // MIQDOR TANLASH
   bot.action(/^miqdor_/, async (ctx) => {
     await connectDB();
     await userHandlers.miqdorTanlashHandler(ctx);
@@ -109,39 +108,32 @@ const createBot = (token) => {
     await userHandlers.bekorInlineHandler(ctx);
   });
 
-  // ADMIN INLINE TUGMALAR
-
-  // Birlik tanlash
+  // ADMIN INLINE
   bot.action(/^birlik_/, async (ctx) => {
     await connectDB();
     await adminHandlers.birlikTanlashHandler(ctx);
   });
 
-  // Birlikni tahrirlash
   bot.action(/^tahrir_birlik_/, async (ctx) => {
     await connectDB();
     await adminHandlers.tahrirBirlikHandler(ctx);
   });
 
-  // Nomini tahrirlash
   bot.action(/^tahrir_nom_/, async (ctx) => {
     await connectDB();
     await adminHandlers.tahrirNomHandler(ctx);
   });
 
-  // Narxini tahrirlash
   bot.action(/^tahrir_narx_/, async (ctx) => {
     await connectDB();
     await adminHandlers.tahrirNarxHandler(ctx);
   });
 
-  // Mahsulotni tanlash (tahrir uchun)
   bot.action(/^tahrir_(?!nom_|narx_|birlik_)/, async (ctx) => {
     await connectDB();
     await adminHandlers.tahrirTanlashHandler(ctx);
   });
 
-  // O'chirish
   bot.action(/^ochirish_/, async (ctx) => {
     await connectDB();
     await adminHandlers.mahsulotOchirishHandler(ctx);
@@ -156,10 +148,8 @@ const createBot = (token) => {
   // MATNLI XABARLAR
   bot.on('text', async (ctx) => {
     await connectDB();
-
     const adminNatija = await adminHandlers.adminMatnHandler(ctx);
     if (adminNatija) return;
-
     const userNatija = await userHandlers.matnHandler(ctx);
     if (userNatija) return;
   });
@@ -172,5 +162,3 @@ const createBot = (token) => {
 };
 
 module.exports = { createBot };
-
-///so'ngi yangilanishh 2026-04-19

@@ -13,13 +13,12 @@ const buyurtmaRaqamiYaratish = () => {
 };
 
 const narxFormat = (narx) => {
-  return narx.toLocaleString('uz-UZ');
+  return Number(narx).toLocaleString('uz-UZ');
 };
 
 const foydalanuvchiTopish = async (ctx) => {
   const telegramId = ctx.from.id;
   let foydalanuvchi = await User.findOne({ telegramId });
-
   if (!foydalanuvchi) {
     foydalanuvchi = new User({
       telegramId,
@@ -28,11 +27,10 @@ const foydalanuvchiTopish = async (ctx) => {
     });
     await foydalanuvchi.save();
   }
-
   return foydalanuvchi;
 };
 
-// /start komandasi
+// ========== /start ==========
 const startHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -44,17 +42,17 @@ const startHandler = async (ctx) => {
     const isAdmin = ctx.from.id === adminId;
 
     const xabar =
-      `🏪 *Feruz Market*ga xush kelibsiz!\n\n` +
-      `Assalomu alaykum, *${foydalanuvchi.ism}*! 👋\n\n` +
+      `🏪 Feruz Marketga xush kelibsiz!\n\n` +
+      `Assalomu alaykum, ${foydalanuvchi.ism}! 👋\n\n` +
       `🛍 Mahsulotlarni ko'rish\n` +
       `🛒 Buyurtma berish\n` +
       `📋 Buyurtmalar tarixini ko'rish\n\n` +
       `Quyidagi tugmalardan birini tanlang:`;
 
     if (isAdmin) {
-      await ctx.reply(xabar, { parse_mode: 'Markdown', ...keyboards.adminMenu() });
+      await ctx.reply(xabar, keyboards.adminMenu());
     } else {
-      await ctx.reply(xabar, { parse_mode: 'Markdown', ...keyboards.boshMenu() });
+      await ctx.reply(xabar, keyboards.boshMenu());
     }
   } catch (xatolik) {
     console.error('Start xatosi:', xatolik);
@@ -62,7 +60,7 @@ const startHandler = async (ctx) => {
   }
 };
 
-// Mahsulotlar ro'yxati
+// ========== Mahsulotlar ==========
 const mahsulotlarHandler = async (ctx) => {
   try {
     const mahsulotlar = await Product.find({ faol: true }).sort({ qoshilgan_sana: -1 });
@@ -71,12 +69,13 @@ const mahsulotlarHandler = async (ctx) => {
       return await ctx.reply('📭 Hozircha mahsulotlar mavjud emas.');
     }
 
-    let xabar = '🛍 *Feruz Market — Mahsulotlar:*\n\n';
+    let xabar = '🛍 Feruz Market — Mahsulotlar:\n\n';
     xabar += '━━━━━━━━━━━━━━━━━━━━━━━\n';
 
     mahsulotlar.forEach((m, index) => {
-      xabar += `${index + 1}. *${m.nomi}*\n`;
-      xabar += `   💰 ${narxFormat(m.narxi)} so'm / ${m.birlik || 'dona'}\n`;
+      const birlik = m.birlik || 'dona';
+      xabar += `${index + 1}. ${m.nomi}\n`;
+      xabar += `   💰 ${narxFormat(m.narxi)} so'm / ${birlik}\n`;
       if (index < mahsulotlar.length - 1) {
         xabar += `   ─────────────────────\n`;
       }
@@ -85,14 +84,14 @@ const mahsulotlarHandler = async (ctx) => {
     xabar += '━━━━━━━━━━━━━━━━━━━━━━━\n';
     xabar += `\n📦 Jami: ${mahsulotlar.length} ta mahsulot`;
 
-    await ctx.reply(xabar, { parse_mode: 'Markdown' });
+    await ctx.reply(xabar);
   } catch (xatolik) {
     console.error('Mahsulotlar xatosi:', xatolik);
     await ctx.reply('❌ Xatolik yuz berdi.');
   }
 };
 
-// Buyurtma berish boshlash
+// ========== Buyurtma boshlash ==========
 const buyurtmaBoshlanishi = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -108,13 +107,10 @@ const buyurtmaBoshlanishi = async (ctx) => {
     await foydalanuvchi.save();
 
     await ctx.reply(
-      '🛒 *Buyurtma berish*\n\n' +
+      '🛒 Buyurtma berish\n\n' +
       'Quyidagi mahsulotlardan tanlang.\n' +
       'Bir nechta mahsulot tanlashingiz mumkin.',
-      {
-        parse_mode: 'Markdown',
-        ...keyboards.mahsulotTanlash(mahsulotlar),
-      }
+      keyboards.mahsulotTanlash(mahsulotlar)
     );
   } catch (xatolik) {
     console.error('Buyurtma boshlash xatosi:', xatolik);
@@ -122,10 +118,7 @@ const buyurtmaBoshlanishi = async (ctx) => {
   }
 };
 
-// =============================================
-// MAHSULOT TANLASH — MIQDOR SO'RASH
-// Foydalanuvchi mahsulotni bosganda miqdor chiqadi
-// =============================================
+// ========== MAHSULOT TANLASH — MIQDOR SO'RASH ==========
 const mahsulotTanlashHandler = async (ctx) => {
   try {
     const mahsulotId = String(ctx.callbackQuery.data).replace('tanlash_', '').trim();
@@ -136,44 +129,44 @@ const mahsulotTanlashHandler = async (ctx) => {
       return await ctx.answerCbQuery('❌ Mahsulot topilmadi!');
     }
 
+    // Birlikni bazadan olamiz (admin qo'shganda belgilagan)
     const birlik = mahsulot.birlik || 'dona';
 
-    // Vaqtinchalik tanlangan mahsulotni saqlash
+    // Vaqtinchalik saqlash
+    const eskiSavat = foydalanuvchi.vaqtinchalik?.savat || [];
+
     foydalanuvchi.vaqtinchalik = {
-      ...(foydalanuvchi.vaqtinchalik || {}),
+      savat: eskiSavat,
       tanlangan_mahsulot: {
         id: String(mahsulot._id),
-        nomi: mahsulot.nomi || 'Mahsulot',
-        narxi: Number(mahsulot.narxi || 0),
-        birlik: birlik,
+        nomi: String(mahsulot.nomi),
+        narxi: Number(mahsulot.narxi),
+        birlik: String(birlik),
       },
     };
-
     foydalanuvchi.holat = 'buyurtma_miqdor';
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
     await ctx.answerCbQuery();
 
-    // editMessageText o‘rniga reply ishlatamiz
+    // Foydalanuvchiga miqdor tanlash tugmalarini ko'rsatish
+    // Birlikka qarab har xil tugmalar chiqadi
     await ctx.reply(
       `📦 ${mahsulot.nomi}\n` +
       `💰 Narxi: ${narxFormat(mahsulot.narxi)} so'm / ${birlik}\n\n` +
       `📏 Necha ${birlik} buyurtma qilasiz?\n\n` +
-      `Quyidagi tugmalardan tanlang yoki o'zingiz yozing:`,
+      `Tugmadan tanlang yoki o'zingiz yozing (masalan: 2.5):`,
       keyboards.miqdorTanlash(birlik)
     );
   } catch (xatolik) {
     console.error('Mahsulot tanlash xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
-    await ctx.reply(`Xato: ${xatolik.message}`);
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
+    await ctx.reply('❌ Xatolik: ' + xatolik.message);
   }
 };
 
-// =============================================
-// MIQDOR TANLASH (INLINE TUGMA ORQALI)
-// 0.5 kg, 1 kg, 2 dona kabi
-// =============================================
+// ========== MIQDOR TANLASH (TUGMA ORQALI) ==========
 const miqdorTanlashHandler = async (ctx) => {
   try {
     const miqdorMatn = ctx.callbackQuery.data.replace('miqdor_', '');
@@ -190,7 +183,9 @@ const miqdorTanlashHandler = async (ctx) => {
       return await ctx.answerCbQuery('❌ Mahsulot topilmadi!');
     }
 
+    // Savatga qo'shish
     const savat = foydalanuvchi.vaqtinchalik?.savat || [];
+    const birlik = tanlangan.birlik || 'dona';
 
     const mavjudIndex = savat.findIndex((item) => item.id === tanlangan.id);
     if (mavjudIndex !== -1) {
@@ -200,21 +195,22 @@ const miqdorTanlashHandler = async (ctx) => {
         id: tanlangan.id,
         nomi: tanlangan.nomi,
         narxi: tanlangan.narxi,
-        birlik: tanlangan.birlik || 'dona',
+        birlik: birlik,
         soni: miqdor,
       });
     }
 
     foydalanuvchi.vaqtinchalik = {
-      savat,
+      savat: savat,
       tanlangan_mahsulot: null,
     };
     foydalanuvchi.holat = 'buyurtma_mahsulot_tanlash';
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
-    await ctx.answerCbQuery(`✅ ${tanlangan.nomi} qo'shildi!`);
+    await ctx.answerCbQuery(`✅ ${tanlangan.nomi} ${miqdor} ${birlik} qo'shildi!`);
 
+    // Savatni ko'rsatish
     let jamiNarx = 0;
     let savatMatni = '🧺 Savatingiz:\n\n';
 
@@ -226,29 +222,25 @@ const miqdorTanlashHandler = async (ctx) => {
     });
 
     savatMatni += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    savatMatni += `💰 Jami: ${narxFormat(jamiNarx)} so'm`;
+    savatMatni += `💰 Jami: ${narxFormat(jamiNarx)} so'm\n\n`;
+    savatMatni += `🗑 Olib tashlash uchun mahsulot ustiga bosing.`;
 
     await ctx.reply(savatMatni, keyboards.savatKorsatish(savat));
   } catch (xatolik) {
     console.error('Miqdor tanlash xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
-    await ctx.reply(`Xato: ${xatolik.message}`);
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
+    await ctx.reply('❌ Xatolik: ' + xatolik.message);
   }
 };
 
-// =============================================
-// MIQDOR QO'LDA KIRITISH (matn orqali)
-// Foydalanuvchi "2.5" yoki "3" deb yozadi
-// =============================================
+// ========== MIQDOR QO'LDA KIRITISH ==========
 const miqdorQabulQilish = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
-
     if (foydalanuvchi.holat !== 'buyurtma_miqdor') return false;
 
     const miqdorMatn = ctx.message.text.trim().replace(',', '.');
     const miqdor = parseFloat(miqdorMatn);
-
     const tanlangan = foydalanuvchi.vaqtinchalik?.tanlangan_mahsulot;
 
     if (!tanlangan) {
@@ -260,10 +252,7 @@ const miqdorQabulQilish = async (ctx) => {
     }
 
     if (isNaN(miqdor) || miqdor <= 0) {
-      await ctx.reply(
-        `❌ Noto'g'ri miqdor!\n\n` +
-        `To'g'ri son kiriting.\nMasalan: 1, 2.5, 0.5`
-      );
+      await ctx.reply('❌ Noto\'g\'ri miqdor!\n\nTo\'g\'ri son kiriting: 1, 2.5, 0.5');
       return true;
     }
 
@@ -272,8 +261,8 @@ const miqdorQabulQilish = async (ctx) => {
       return true;
     }
 
-    // Savatga qo'shish
     const savat = foydalanuvchi.vaqtinchalik?.savat || [];
+    const birlik = tanlangan.birlik || 'dona';
 
     const mavjudIndex = savat.findIndex((item) => item.id === tanlangan.id);
     if (mavjudIndex !== -1) {
@@ -283,35 +272,34 @@ const miqdorQabulQilish = async (ctx) => {
         id: tanlangan.id,
         nomi: tanlangan.nomi,
         narxi: tanlangan.narxi,
-        birlik: tanlangan.birlik,
+        birlik: birlik,
         soni: miqdor,
       });
     }
 
     foydalanuvchi.vaqtinchalik = {
-      savat,
+      savat: savat,
       tanlangan_mahsulot: null,
     };
     foydalanuvchi.holat = 'buyurtma_mahsulot_tanlash';
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
-    // Savatni ko'rsatish
     let jamiNarx = 0;
-    let savatMatni = `✅ *${tanlangan.nomi}* ${miqdor} ${tanlangan.birlik} qo'shildi!\n\n`;
-    savatMatni += '🧺 *Savatingiz:*\n\n';
+    let savatMatni = `✅ ${tanlangan.nomi} ${miqdor} ${birlik} qo'shildi!\n\n`;
+    savatMatni += '🧺 Savatingiz:\n\n';
 
     savat.forEach((item, index) => {
       const narx = item.narxi * item.soni;
       jamiNarx += narx;
-      savatMatni += `${index + 1}. *${item.nomi}* — ${item.soni} ${item.birlik}\n`;
+      savatMatni += `${index + 1}. ${item.nomi} — ${item.soni} ${item.birlik || 'dona'}\n`;
       savatMatni += `   💰 ${narxFormat(item.narxi)} x ${item.soni} = ${narxFormat(narx)} so'm\n`;
     });
-    savatMatni += `\n💰 *Jami: ${narxFormat(jamiNarx)} so'm*`;
+    savatMatni += `\n💰 Jami: ${narxFormat(jamiNarx)} so'm`;
 
     const mahsulotlar = await Product.find({ faol: true }).sort({ nomi: 1 });
 
-    await ctx.reply(savatMatni, { parse_mode: 'Markdown' });
+    await ctx.reply(savatMatni);
     await ctx.reply(
       '➕ Yana mahsulot qo\'shish uchun tanlang yoki ✅ Tasdiqlang:',
       keyboards.mahsulotTanlash(mahsulotlar)
@@ -325,7 +313,7 @@ const miqdorQabulQilish = async (ctx) => {
   }
 };
 
-// Savatdan olib tashlash
+// ========== Savatdan olib tashlash ==========
 const olibTashlashHandler = async (ctx) => {
   try {
     const index = parseInt(ctx.callbackQuery.data.replace('olib_tashlash_', ''));
@@ -334,7 +322,7 @@ const olibTashlashHandler = async (ctx) => {
 
     if (index >= 0 && index < savat.length) {
       const olibTashlangan = savat.splice(index, 1)[0];
-      foydalanuvchi.vaqtinchalik = { ...foydalanuvchi.vaqtinchalik, savat };
+      foydalanuvchi.vaqtinchalik = { ...(foydalanuvchi.vaqtinchalik || {}), savat };
       foydalanuvchi.markModified('vaqtinchalik');
       await foydalanuvchi.save();
 
@@ -342,34 +330,31 @@ const olibTashlashHandler = async (ctx) => {
 
       if (savat.length === 0) {
         const mahsulotlar = await Product.find({ faol: true }).sort({ nomi: 1 });
-        await ctx.editMessageText(
+        await ctx.reply(
           '🛒 Savat bo\'sh. Mahsulotlardan tanlang:',
           keyboards.mahsulotTanlash(mahsulotlar)
         );
       } else {
         let jamiNarx = 0;
-        let savatMatni = '🧺 *Savatingiz:*\n\n';
+        let savatMatni = '🧺 Savatingiz:\n\n';
         savat.forEach((item, i) => {
           const narx = item.narxi * item.soni;
           jamiNarx += narx;
-          savatMatni += `${i + 1}. *${item.nomi}* — ${item.soni} ${item.birlik || 'dona'}\n`;
+          savatMatni += `${i + 1}. ${item.nomi} — ${item.soni} ${item.birlik || 'dona'}\n`;
           savatMatni += `   💰 ${narxFormat(item.narxi)} x ${item.soni} = ${narxFormat(narx)} so'm\n`;
         });
-        savatMatni += `\n💰 *Jami: ${narxFormat(jamiNarx)} so'm*`;
+        savatMatni += `\n💰 Jami: ${narxFormat(jamiNarx)} so'm`;
 
-        await ctx.editMessageText(savatMatni, {
-          parse_mode: 'Markdown',
-          ...keyboards.savatKorsatish(savat),
-        });
+        await ctx.reply(savatMatni, keyboards.savatKorsatish(savat));
       }
     }
   } catch (xatolik) {
     console.error('Olib tashlash xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
   }
 };
 
-// Yana qo'shish
+// ========== Yana qo'shish ==========
 const yanaQoshishHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -378,18 +363,18 @@ const yanaQoshishHandler = async (ctx) => {
 
     const mahsulotlar = await Product.find({ faol: true }).sort({ nomi: 1 });
 
-    await ctx.editMessageText(
+    await ctx.answerCbQuery();
+    await ctx.reply(
       '🛒 Mahsulotlardan tanlang:',
       keyboards.mahsulotTanlash(mahsulotlar)
     );
-    await ctx.answerCbQuery();
   } catch (xatolik) {
     console.error('Yana qo\'shish xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
   }
 };
 
-// Savatni tozalash
+// ========== Savatni tozalash ==========
 const savatniTozalashHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -398,16 +383,15 @@ const savatniTozalashHandler = async (ctx) => {
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
-    await ctx.editMessageText('🗑 Savat tozalandi.');
     await ctx.answerCbQuery('Savat tozalandi!');
-    await ctx.reply('Bosh menyuga qaytdingiz.', keyboards.boshMenu());
+    await ctx.reply('🗑 Savat tozalandi.\n\nBosh menyuga qaytdingiz.', keyboards.boshMenu());
   } catch (xatolik) {
     console.error('Savat tozalash xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
   }
 };
 
-// Rasmiylashtirish — telefon so'rash
+// ========== Rasmiylashtirish — telefon so'rash ==========
 const rasmiylashtirishHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -423,19 +407,16 @@ const rasmiylashtirishHandler = async (ctx) => {
 
     await ctx.answerCbQuery();
     await ctx.reply(
-      '📱 *Telefon raqamingizni yuboring:*\n\nTugmani bosing yoki qo\'lda kiriting:',
-      {
-        parse_mode: 'Markdown',
-        ...keyboards.telefonYuborish(),
-      }
+      '📱 Telefon raqamingizni yuboring:\n\nTugmani bosing yoki qo\'lda kiriting:',
+      keyboards.telefonYuborish()
     );
   } catch (xatolik) {
     console.error('Rasmiylashtirish xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
   }
 };
 
-// Tasdiqlash
+// ========== Tasdiqlash ==========
 const tasdiqlashBuyurtmaHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -447,31 +428,27 @@ const tasdiqlashBuyurtmaHandler = async (ctx) => {
     }
 
     let jamiNarx = 0;
-    let savatMatni = '🧺 *Savatingiz:*\n\n';
+    let savatMatni = '🧺 Savatingiz:\n\n';
     savat.forEach((item, i) => {
       const narx = item.narxi * item.soni;
       jamiNarx += narx;
-      savatMatni += `${i + 1}. *${item.nomi}* — ${item.soni} ${item.birlik || 'dona'}\n`;
+      savatMatni += `${i + 1}. ${item.nomi} — ${item.soni} ${item.birlik || 'dona'}\n`;
       savatMatni += `   💰 ${narxFormat(narx)} so'm\n`;
     });
-    savatMatni += `\n💰 *Jami: ${narxFormat(jamiNarx)} so'm*`;
+    savatMatni += `\n💰 Jami: ${narxFormat(jamiNarx)} so'm`;
 
-    await ctx.editMessageText(savatMatni, {
-      parse_mode: 'Markdown',
-      ...keyboards.savatKorsatish(savat),
-    });
     await ctx.answerCbQuery();
+    await ctx.reply(savatMatni, keyboards.savatKorsatish(savat));
   } catch (xatolik) {
     console.error('Tasdiqlash xatosi:', xatolik);
-    await ctx.answerCbQuery('❌ Xatolik!');
+    try { await ctx.answerCbQuery('❌ Xatolik!'); } catch(e) {}
   }
 };
 
-// Telefon qabul qilish
+// ========== Telefon qabul qilish ==========
 const telefonQabulQilish = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
-
     if (foydalanuvchi.holat !== 'buyurtma_telefon') return false;
 
     let telefon = '';
@@ -490,17 +467,14 @@ const telefonQabulQilish = async (ctx) => {
       }
     }
 
-    foydalanuvchi.vaqtinchalik = { ...foydalanuvchi.vaqtinchalik, telefon };
+    foydalanuvchi.vaqtinchalik = { ...(foydalanuvchi.vaqtinchalik || {}), telefon };
     foydalanuvchi.holat = 'buyurtma_manzil';
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
     await ctx.reply(
-      '📍 *Yetkazib berish manzilini yozing:*\n\nMasalan: Toshkent, Chilonzor, 7-mavze, 15-uy',
-      {
-        parse_mode: 'Markdown',
-        ...keyboards.bekorQilish(),
-      }
+      '📍 Yetkazib berish manzilini yozing:\n\nMasalan: Toshkent, Chilonzor, 7-mavze, 15-uy',
+      keyboards.bekorQilish()
     );
 
     return true;
@@ -510,13 +484,10 @@ const telefonQabulQilish = async (ctx) => {
   }
 };
 
-// =============================================
-// MANZIL QABUL + SAQLASH + ADMINGA XABAR
-// =============================================
+// ========== MANZIL QABUL + SAQLASH + ADMINGA XABAR ==========
 const manzilQabulQilish = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
-
     if (foydalanuvchi.holat !== 'buyurtma_manzil') return false;
 
     const manzil = ctx.message.text.trim();
@@ -537,7 +508,7 @@ const manzilQabulQilish = async (ctx) => {
       return true;
     }
 
-    // Buyurtma raqami
+    // Buyurtma raqami yaratish
     let buyurtmaRaqami;
     let takrorlanmasin = true;
     while (takrorlanmasin) {
@@ -559,7 +530,7 @@ const manzilQabulQilish = async (ctx) => {
       };
     });
 
-    // Buyurtmani saqlash
+    // Bazaga saqlash
     const buyurtma = new Order({
       buyurtma_raqami: buyurtmaRaqami,
       foydalanuvchi_id: ctx.from.id,
@@ -569,7 +540,6 @@ const manzilQabulQilish = async (ctx) => {
       telefon,
       manzil,
     });
-
     await buyurtma.save();
 
     // Holatni tozalash
@@ -580,8 +550,8 @@ const manzilQabulQilish = async (ctx) => {
 
     // FOYDALANUVCHIGA XABAR
     let tasdiqXabari =
-      `✅ *Buyurtmangiz qabul qilindi!*\n\n` +
-      `📦 Buyurtma raqami: \`${buyurtmaRaqami}\`\n` +
+      `✅ Buyurtmangiz qabul qilindi!\n\n` +
+      `📦 Buyurtma raqami: ${buyurtmaRaqami}\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
     mahsulotlar.forEach((item, index) => {
@@ -591,65 +561,48 @@ const manzilQabulQilish = async (ctx) => {
 
     tasdiqXabari +=
       `━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `💰 Jami: *${narxFormat(jamiNarx)} so'm*\n\n` +
+      `💰 Jami: ${narxFormat(jamiNarx)} so'm\n\n` +
       `📱 Telefon: ${telefon}\n` +
       `📍 Manzil: ${manzil}\n\n` +
       `⏳ Tez orada ko'rib chiqiladi.\n` +
-      `Rahmat, *Feruz Market*! 🙏`;
+      `Rahmat, Feruz Market! 🙏`;
 
-    await ctx.reply(tasdiqXabari, {
-      parse_mode: 'Markdown',
-      ...keyboards.boshMenu(),
-    });
+    await ctx.reply(tasdiqXabari, keyboards.boshMenu());
 
     // ADMINGA BILDIRISHNOMA
     const ADMIN_ID = process.env.ADMIN_ID;
 
     if (ADMIN_ID) {
       let adminXabari = '';
-      adminXabari += '🔔🔔🔔 *YANGI BUYURTMA!* 🔔🔔🔔\n\n';
-      adminXabari += `📦 Raqami: \`${buyurtmaRaqami}\`\n`;
-      adminXabari += `👤 Mijoz: *${foydalanuvchi.ism}*\n`;
-      adminXabari += `🆔 ID: \`${ctx.from.id}\`\n`;
+      adminXabari += '🔔🔔🔔 YANGI BUYURTMA! 🔔🔔🔔\n\n';
+      adminXabari += `📦 Raqami: ${buyurtmaRaqami}\n`;
+      adminXabari += `👤 Mijoz: ${foydalanuvchi.ism}\n`;
+      adminXabari += `🆔 ID: ${ctx.from.id}\n`;
 
       if (foydalanuvchi.username) {
         adminXabari += `📎 @${foydalanuvchi.username}\n`;
       }
 
       adminXabari += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      adminXabari += `🛒 *Mahsulotlar:*\n\n`;
+      adminXabari += `🛒 Mahsulotlar:\n\n`;
 
       mahsulotlar.forEach((item, index) => {
-        adminXabari += `  ${index + 1}. *${item.nomi}*\n`;
+        adminXabari += `  ${index + 1}. ${item.nomi}\n`;
         adminXabari += `     📏 ${item.soni} ${item.birlik}\n`;
         adminXabari += `     💰 ${narxFormat(item.narxi)} x ${item.soni} = ${narxFormat(item.narxi * item.soni)} so'm\n\n`;
       });
 
       adminXabari += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      adminXabari += `💰 *JAMI: ${narxFormat(jamiNarx)} so'm*\n`;
+      adminXabari += `💰 JAMI: ${narxFormat(jamiNarx)} so'm\n`;
       adminXabari += `━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
       adminXabari += `📱 Tel: ${telefon}\n`;
       adminXabari += `📍 Manzil: ${manzil}\n`;
       adminXabari += `🕐 ${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`;
 
       try {
-        await ctx.telegram.sendMessage(Number(ADMIN_ID), adminXabari, {
-          parse_mode: 'Markdown',
-        });
+        await ctx.telegram.sendMessage(Number(ADMIN_ID), adminXabari);
       } catch (adminErr) {
         console.error('Admin xabar xatosi:', adminErr.message);
-        try {
-          const oddiy =
-            `🔔 YANGI BUYURTMA!\n\n` +
-            `Raqam: ${buyurtmaRaqami}\n` +
-            `Mijoz: ${foydalanuvchi.ism}\n` +
-            `Tel: ${telefon}\n` +
-            `Manzil: ${manzil}\n` +
-            `Jami: ${narxFormat(jamiNarx)} so'm`;
-          await ctx.telegram.sendMessage(Number(ADMIN_ID), oddiy);
-        } catch (err2) {
-          console.error('Ikkinchi urinish xato:', err2.message);
-        }
       }
     }
 
@@ -661,7 +614,7 @@ const manzilQabulQilish = async (ctx) => {
   }
 };
 
-// Buyurtmalar tarixi
+// ========== Buyurtmalar tarixi ==========
 const buyurtmalarTarixiHandler = async (ctx) => {
   try {
     const buyurtmalar = await Order.find({ foydalanuvchi_id: ctx.from.id })
@@ -672,7 +625,7 @@ const buyurtmalarTarixiHandler = async (ctx) => {
       return await ctx.reply('📭 Sizda hali buyurtmalar yo\'q.', keyboards.boshMenu());
     }
 
-    let xabar = '📋 *Buyurtmalar tarixingiz:*\n\n';
+    let xabar = '📋 Buyurtmalar tarixingiz:\n\n';
 
     const holatBelgisi = {
       yangi: '🆕', qabul_qilindi: '✅', yetkazilmoqda: '🚚',
@@ -690,7 +643,7 @@ const buyurtmalarTarixiHandler = async (ctx) => {
         hour: '2-digit', minute: '2-digit',
       });
 
-      xabar += `${index + 1}. 📦 \`${b.buyurtma_raqami}\`\n`;
+      xabar += `${index + 1}. 📦 ${b.buyurtma_raqami}\n`;
       xabar += `   ${holatBelgisi[b.holati] || '❓'} ${holatNomi[b.holati] || b.holati}\n`;
 
       b.mahsulotlar.forEach((m) => {
@@ -702,25 +655,25 @@ const buyurtmalarTarixiHandler = async (ctx) => {
       if (index < buyurtmalar.length - 1) xabar += `   ─────────────────────\n`;
     });
 
-    await ctx.reply(xabar, { parse_mode: 'Markdown' });
+    await ctx.reply(xabar);
   } catch (xatolik) {
     console.error('Buyurtmalar tarixi xatosi:', xatolik);
     await ctx.reply('❌ Xatolik yuz berdi.');
   }
 };
 
-// Yordam
+// ========== Yordam ==========
 const yordamHandler = async (ctx) => {
-  const xabar =
-    'ℹ️ *Feruz Market — Yordam*\n\n' +
-    '🛍 *Mahsulotlar* — Mahsulotlarni ko\'rish\n' +
-    '🛒 *Buyurtma berish* — Yangi buyurtma\n' +
-    '📋 *Buyurtmalar tarixi* — Oldingi buyurtmalar\n\n' +
-    '🏪 *Feruz Market* — Sifatli mahsulotlar!';
-  await ctx.reply(xabar, { parse_mode: 'Markdown' });
+  await ctx.reply(
+    'ℹ️ Feruz Market — Yordam\n\n' +
+    '🛍 Mahsulotlar — Mahsulotlarni ko\'rish\n' +
+    '🛒 Buyurtma berish — Yangi buyurtma\n' +
+    '📋 Buyurtmalar tarixi — Oldingi buyurtmalar\n\n' +
+    '🏪 Feruz Market — Sifatli mahsulotlar!'
+  );
 };
 
-// Bekor qilish
+// ========== Bekor qilish ==========
 const bekorQilishHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -741,7 +694,7 @@ const bekorQilishHandler = async (ctx) => {
   }
 };
 
-// Inline bekor qilish
+// ========== Inline bekor qilish ==========
 const bekorInlineHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
@@ -750,14 +703,14 @@ const bekorInlineHandler = async (ctx) => {
     foydalanuvchi.markModified('vaqtinchalik');
     await foydalanuvchi.save();
 
-    await ctx.editMessageText('❌ Bekor qilindi.');
     await ctx.answerCbQuery('Bekor qilindi');
+    await ctx.reply('❌ Bekor qilindi.', keyboards.boshMenu());
   } catch (xatolik) {
     try { await ctx.answerCbQuery('Bekor qilindi'); } catch (e) {}
   }
 };
 
-// Matnli xabarlarni holat bo'yicha yo'naltirish
+// ========== Matn handler ==========
 const matnHandler = async (ctx) => {
   try {
     const foydalanuvchi = await foydalanuvchiTopish(ctx);
