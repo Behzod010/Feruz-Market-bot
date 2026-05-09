@@ -73,9 +73,8 @@ const mahsulotlarHandler = async (ctx) => {
     xabar += '━━━━━━━━━━━━━━━━━━━━━━━\n';
 
     mahsulotlar.forEach((m, index) => {
-      const birlik = m.birlik || 'dona';
       xabar += `${index + 1}. ${m.nomi}\n`;
-      xabar += `   💰 ${narxFormat(m.narxi)} so'm / ${birlik}\n`;
+      xabar += `   💰 ${narxFormat(m.narxi)} so'm\n`;  // ← birlik olib tashlandi
       if (index < mahsulotlar.length - 1) {
         xabar += `   ─────────────────────\n`;
       }

@@ -60,10 +60,9 @@ const birlikTanlash = () => {
 // Mahsulot tanlash (buyurtma uchun)
 const mahsulotTanlash = (mahsulotlar) => {
   const tugmalar = mahsulotlar.map((m) => {
-    const birlik = m.birlik || 'dona';
     return [
       Markup.button.callback(
-        `${m.nomi} — ${m.narxi.toLocaleString('uz-UZ')} so'm/${birlik}`,
+        `${m.nomi} — ${m.narxi.toLocaleString('uz-UZ')} so'm`,  // ← birlik olib tashlandi
         `tanlash_${m._id}`
       ),
     ];
